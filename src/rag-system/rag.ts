@@ -86,7 +86,7 @@ async function retrieveDocs(state: GraphInterface) {
 
     const retrievedDocs = await vectorStore.asRetriever().invoke(state.question);
 
-    return { doucments: retrievedDocs };
+    return { documents: retrievedDocs };
 }
 
 
