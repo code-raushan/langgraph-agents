@@ -107,26 +107,21 @@ async function retrieveDocs(state: GraphInterface) {
 // node to grade the documents according to the user question and filter out the irrelevant docs
 async function gradeDocuments(state: GraphInterface) {
     const docs = state.documents;
-    const relevantDocs = [];
+    const gradingPrompt = ChatPromptTemplate.fromTemplate(GRADER_TEMPLATE);
+    const docsGrader = gradingPrompt.pipe(state.jsonResponseModel);
 
-    for (const doc of docs) {
-        const gradingPrompt = ChatPromptTemplate.fromTemplate(GRADER_TEMPLATE);
-
-        const docsGrader = gradingPrompt.pipe(state.jsonResponseModel);
-
+    const gradingPromises = docs.map(async (doc) => {
         const gradedResponse = await docsGrader.invoke({
             document: doc.pageContent,
             question: state.question
         });
 
         const parsedResponse = JSON.parse(gradedResponse.content as string);
+        return parsedResponse.relevant ? doc : null;
+    });
 
-        if (parsedResponse.relevant) {
-            relevantDocs.push(doc);
-        }
-    }
-
-    return { documents: relevantDocs };
+    const gradedDocs = await Promise.all(gradingPromises);
+    return { documents: gradedDocs.filter(Boolean) };
 
 }
 

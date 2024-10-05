@@ -6,7 +6,10 @@ app.use(express.json());
 
 app.post("/ask", async (req: Request, res: Response) => {
     const question = req.body.question as string;
-    const response = await invokeRAG(question);
+    const response = await invokeRAG(question).catch(err => {
+        console.error(err);
+        return { error: "Failed to generate response" };
+    });
 
     res.json(response);
 });
