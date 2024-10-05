@@ -10,6 +10,7 @@ interface GraphInterface {
     generatedAnswer: string;
     document: Document[];
     model: ChatOllama;
+    jsonResponseModel: ChatOllama;
 }
 
 // create model node
@@ -21,6 +22,17 @@ async function createModel(state: GraphInterface) {
     });
 
     return { model };
+}
+
+async function createJsonResponseModel(state: GraphInterface) {
+    const jsonResponseModel = new ChatOllama({
+        model: "llama3.2:latest",
+        baseUrl: "http://localhost:11434",
+        temperature: 0,
+        format: "json"
+    });
+
+    return { jsonResponseModel };
 }
 
 async function buildVectorStore() {
