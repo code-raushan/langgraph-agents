@@ -12,11 +12,15 @@ interface GraphInterface {
     model: ChatOllama;
 }
 
-const model = new ChatOllama({
-    model: "llama3.2:latest",
-    baseUrl: "http://localhost:11434",
-    temperature: 0,
-});
+async function createModel(state: GraphInterface) {
+    const model = new ChatOllama({
+        model: "llama3.2:latest",
+        baseUrl: "http://localhost:11434",
+        temperature: 0,
+    });
+
+    return { model };
+}
 
 async function buildVectorStore() {
     const urls = [
