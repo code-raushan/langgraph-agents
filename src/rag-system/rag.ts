@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
+import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/hf_transformers";
 import { Document } from "@langchain/core/documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
-import { NomicEmbeddings } from "@langchain/nomic";
 import { ChatOllama } from "@langchain/ollama";
 import * as hub from "langchain/hub";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
@@ -17,7 +18,7 @@ interface GraphInterface {
     documents: Document[];
     model: ChatOllama;
     jsonResponseModel: ChatOllama;
-};
+}
 
 const graphState = {
     question: null,
@@ -39,7 +40,7 @@ async function createModel(state: GraphInterface) {
     });
 
     return { model };
-};
+}
 
 async function createJsonResponseModel(state: GraphInterface) {
     const jsonResponseModel = new ChatOllama({
@@ -50,7 +51,7 @@ async function createJsonResponseModel(state: GraphInterface) {
     });
 
     return { jsonResponseModel };
-};
+}
 
 async function buildVectorStore() {
     const urls = [
@@ -72,10 +73,12 @@ async function buildVectorStore() {
 
     const splittedDocs = await textSplitter.splitDocuments(docs.flat());
 
-    const vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new NomicEmbeddings());
+    const vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new HuggingFaceTransformersEmbeddings({
+        model: "Xenova/all-MiniLM-L6-v2",
+    }));
 
     return vectorStore;
-};
+}
 
 // node to retrieve docs according to input question from the vector store
 async function retrieveDocs(state: GraphInterface) {
@@ -83,8 +86,8 @@ async function retrieveDocs(state: GraphInterface) {
 
     const retrievedDocs = await vectorStore.asRetriever().invoke(state.question);
 
-    return { doucments: retrievedDocs }
-};
+    return { doucments: retrievedDocs };
+}
 
 
 // node to grade the documents according to the user question and filter out the irrelevant docs
@@ -111,11 +114,11 @@ async function gradeDocuments(state: GraphInterface) {
 
     return { documents: relevantDocs };
 
-};
+}
 
 function hasRelevantDocs(state: GraphInterface) {
     return state.documents.length > 0 ? "yes" : "no";
-};
+}
 
 // node to generate answer according to the relevant docs
 async function generateAnswer(state: GraphInterface) {
@@ -128,7 +131,7 @@ async function generateAnswer(state: GraphInterface) {
     });
 
     return { generatedAnswer };
-};
+}
 
 async function gradeAnswer(state: GraphInterface) {
     const answerGraderPrompt = ChatPromptTemplate.fromTemplate(ANSWER_GRADER_TEMPLATE);
@@ -146,7 +149,7 @@ async function gradeAnswer(state: GraphInterface) {
     }
 
     return { generatedAnswer: "Sorry, I am unable to help you with this question." };
-};
+}
 
 const graph = new StateGraph<GraphInterface>({ channels: graphState })
     .addNode("retrieve_docs", retrieveDocs)
