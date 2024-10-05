@@ -6,12 +6,13 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 
 interface GraphInterface {
-    questions: string;
+    question: string;
     generatedAnswer: string;
     document: Document[];
     model: ChatOllama;
 }
 
+// create model node
 async function createModel(state: GraphInterface) {
     const model = new ChatOllama({
         model: "llama3.2:latest",
@@ -45,5 +46,14 @@ async function buildVectorStore() {
     const vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new NomicEmbeddings());
 
     return vectorStore;
-
 }
+
+// node to retrieve docs according to input question from the vector store
+async function retrieveDocs(state: GraphInterface) {
+    const vectorStore = await buildVectorStore();
+
+    const retrievedDocs = await vectorStore.asRetriever().invoke(state.question);
+
+    return { documents: retrieveDocs }
+}
+
