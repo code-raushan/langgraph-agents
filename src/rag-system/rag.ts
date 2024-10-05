@@ -1,17 +1,34 @@
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { Document } from "@langchain/core/documents";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
 import { NomicEmbeddings } from "@langchain/nomic";
 import { ChatOllama } from "@langchain/ollama";
+import * as hub from "langchain/hub";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { ANSWER_GRADER_TEMPLATE, GRADER_TEMPLATE } from "../utils/const";
+
 
 interface GraphInterface {
     question: string;
     generatedAnswer: string;
-    document: Document[];
+    documents: Document[];
     model: ChatOllama;
     jsonResponseModel: ChatOllama;
-}
+};
+
+const graphState = {
+    question: null,
+    generatedAnswer: null,
+    documents: {
+        value: (x: Document[], y: Document[]) => y,
+        default: () => [],
+    },
+    model: null,
+    jsonResponseModel: null
+};
 
 // create model node
 async function createModel(state: GraphInterface) {
@@ -22,7 +39,7 @@ async function createModel(state: GraphInterface) {
     });
 
     return { model };
-}
+};
 
 async function createJsonResponseModel(state: GraphInterface) {
     const jsonResponseModel = new ChatOllama({
@@ -33,7 +50,7 @@ async function createJsonResponseModel(state: GraphInterface) {
     });
 
     return { jsonResponseModel };
-}
+};
 
 async function buildVectorStore() {
     const urls = [
@@ -58,7 +75,7 @@ async function buildVectorStore() {
     const vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new NomicEmbeddings());
 
     return vectorStore;
-}
+};
 
 // node to retrieve docs according to input question from the vector store
 async function retrieveDocs(state: GraphInterface) {
@@ -66,6 +83,98 @@ async function retrieveDocs(state: GraphInterface) {
 
     const retrievedDocs = await vectorStore.asRetriever().invoke(state.question);
 
-    return { documents: retrieveDocs }
-}
+    return { doucments: retrievedDocs }
+};
 
+
+// node to grade the documents according to the user question and filter out the irrelevant docs
+async function gradeDocuments(state: GraphInterface) {
+    const docs = state.documents;
+    const relevantDocs = [];
+
+    for (const doc of docs) {
+        const gradingPrompt = ChatPromptTemplate.fromTemplate(GRADER_TEMPLATE);
+
+        const docsGrader = gradingPrompt.pipe(state.jsonResponseModel);
+
+        const gradedResponse = await docsGrader.invoke({
+            document: doc.pageContent,
+            question: state.question
+        });
+
+        const parsedResponse = JSON.parse(gradedResponse.content as string);
+
+        if (parsedResponse.relevant) {
+            relevantDocs.push(doc);
+        }
+    }
+
+    return { documents: relevantDocs };
+
+};
+
+function hasRelevantDocs(state: GraphInterface) {
+    return state.documents.length > 0 ? "yes" : "no";
+};
+
+// node to generate answer according to the relevant docs
+async function generateAnswer(state: GraphInterface) {
+    const ragPrompt = await hub.pull("rlm/rag-prompt");
+    const ragChain = ragPrompt.pipe(state.model).pipe(new StringOutputParser());
+
+    const generatedAnswer = await ragChain.invoke({
+        context: state.documents,
+        question: state.question
+    });
+
+    return { generatedAnswer };
+};
+
+async function gradeAnswer(state: GraphInterface) {
+    const answerGraderPrompt = ChatPromptTemplate.fromTemplate(ANSWER_GRADER_TEMPLATE);
+    const answerGrader = answerGraderPrompt.pipe(state.jsonResponseModel);
+
+    const gradedResponse = await answerGrader.invoke({
+        question: state.question,
+        answer: state.generatedAnswer
+    });
+
+    const parsedResponse = JSON.parse(gradedResponse.content as string);
+
+    if (parsedResponse.relevant) {
+        return { generatedAnswer: state.generatedAnswer };
+    }
+
+    return { generatedAnswer: "Sorry, I am unable to help you with this question." };
+};
+
+const graph = new StateGraph<GraphInterface>({ channels: graphState })
+    .addNode("retrieve_docs", retrieveDocs)
+    .addNode("create_model", createModel)
+    .addNode("create_json_response_model", createJsonResponseModel)
+    .addNode("grade_documents", gradeDocuments)
+    .addNode("generate_answer", generateAnswer)
+    .addNode("grade_answer", gradeAnswer)
+    .addEdge(START, "retrieve_docs")
+    .addEdge("retrieve_docs", "create_model")
+    .addEdge("create_model", "create_json_response_model")
+    .addEdge("create_json_response_model", "grade_documents")
+    .addConditionalEdges("grade_documents", hasRelevantDocs, {
+        yes: "generate_answer",
+        no: END
+    })
+    .addEdge("generate_answer", "grade_answer")
+    .addEdge("grade_answer", END);
+
+const ragApp = graph.compile({
+    checkpointer: new MemorySaver()
+});
+
+export const invokeRAG = async (question: string) => {
+    const graphResponse: GraphInterface = await ragApp.invoke(
+        { question },
+        { configurable: { thread_id: "1" } }
+    );
+
+    return graphResponse;
+};
