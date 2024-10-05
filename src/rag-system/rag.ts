@@ -4,8 +4,8 @@ import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddin
 import { Document } from "@langchain/core/documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatGroq } from "@langchain/groq";
 import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
-import { ChatOllama } from "@langchain/ollama";
 import * as hub from "langchain/hub";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
@@ -16,8 +16,10 @@ interface GraphInterface {
     question: string;
     generatedAnswer: string;
     documents: Document[];
-    model: ChatOllama;
-    jsonResponseModel: ChatOllama;
+    // model: ChatOllama;
+    // jsonResponseModel: ChatOllama;
+    model: ChatGroq;
+    jsonResponseModel: ChatGroq;
 }
 
 const graphState = {
@@ -33,9 +35,13 @@ const graphState = {
 
 // create model node
 async function createModel(state: GraphInterface) {
-    const model = new ChatOllama({
-        model: "llama3.2:latest",
-        baseUrl: "http://localhost:11434",
+    // const model = new ChatOllama({
+    //     model: "llama3.2:latest",
+    //     baseUrl: "http://localhost:11434",
+    //     temperature: 0,
+    // });
+    const model = new ChatGroq({
+        model: "llama-3.2-3b-preview",
         temperature: 0,
     });
 
@@ -43,11 +49,19 @@ async function createModel(state: GraphInterface) {
 }
 
 async function createJsonResponseModel(state: GraphInterface) {
-    const jsonResponseModel = new ChatOllama({
-        model: "llama3.2:latest",
-        baseUrl: "http://localhost:11434",
+    // const jsonResponseModel = new ChatOllama({
+    //     model: "llama3.2:latest",
+    //     baseUrl: "http://localhost:11434",
+    //     temperature: 0,
+    //     format: "json"
+    // });
+    const groqModel = new ChatGroq({
+        model: "llama-3.2-3b-preview",
         temperature: 0,
-        format: "json"
+    });
+
+    const jsonResponseModel = groqModel.bind({
+        response_format: { type: "json_object" }
     });
 
     return { jsonResponseModel };

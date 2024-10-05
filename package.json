@@ -26,6 +26,7 @@
   "dependencies": {
     "@langchain/community": "^0.3.4",
     "@langchain/core": "^0.3.7",
+    "@langchain/groq": "^0.1.2",
     "@langchain/langgraph": "^0.2.11",
     "@langchain/nomic": "^0.1.0",
     "@langchain/ollama": "^0.1.0",
