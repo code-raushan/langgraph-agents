@@ -6,7 +6,7 @@ import { Document } from "@langchain/core/documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { ChatGroq } from "@langchain/groq";
-import { END, START, StateGraph } from "@langchain/langgraph";
+import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
 import * as hub from "langchain/hub";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
@@ -207,14 +207,14 @@ const graph = new StateGraph<GraphInterface>({ channels: graphState })
     .addEdge("grade_answer", END);
 
 const ragApp = graph.compile({
-    // checkpointer: new MemorySaver()
+    checkpointer: new MemorySaver()
 });
 
 export async function invokeRAG(question: string) {
     console.log("reached invoke function");
     const graphResponse: GraphInterface = await ragApp.invoke(
         { question },
-        { configurable: { thread_id: "1" } }
+        { configurable: { thread_id: crypto.randomUUID() } }
     );
 
     // console.log(ragApp.getGraph().drawMermaid());
