@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/hf_transformers";
@@ -98,9 +99,12 @@ async function buildVectorStore() {
 
 // node to retrieve docs according to input question from the vector store
 async function retrieveDocs(state: GraphInterface) {
+    const start = new Date();
     const vectorStore = await buildVectorStore();
 
     const retrievedDocs = await vectorStore.asRetriever().invoke(state.question);
+    const end = new Date();
+    console.log(`Time taken to retrieve docs: ${end.getTime() - start.getTime()} milliseconds`);
 
     return { documents: retrievedDocs };
 }
@@ -108,6 +112,7 @@ async function retrieveDocs(state: GraphInterface) {
 
 // node to grade the documents according to the user question and filter out the irrelevant docs
 async function gradeDocuments(state: GraphInterface) {
+    const start = new Date();
     const docs = state.documents;
     const gradingPrompt = ChatPromptTemplate.fromTemplate(GRADER_TEMPLATE);
     const docsGrader = gradingPrompt.pipe(state.jsonResponseModel);
@@ -123,16 +128,23 @@ async function gradeDocuments(state: GraphInterface) {
     });
 
     const gradedDocs = await Promise.all(gradingPromises);
+    const end = new Date();
+    console.log(`Time taken to grade docs: ${end.getTime() - start.getTime()} milliseconds`);
     return { documents: gradedDocs.filter(Boolean) };
 
 }
 
 function hasRelevantDocs(state: GraphInterface) {
-    return state.documents.length > 0 ? "yes" : "no";
+    const start = new Date();
+    const relevant = state.documents.length > 0;
+    const end = new Date();
+    console.log(`Time taken to check relevant docs: ${end.getTime() - start.getTime()} milliseconds`);
+    return relevant ? "yes" : "no";
 }
 
 // node to generate answer according to the relevant docs
 async function generateAnswer(state: GraphInterface) {
+    const start = new Date();
     const ragPrompt = await hub.pull("rlm/rag-prompt");
     const ragChain = ragPrompt.pipe(state.model).pipe(new StringOutputParser());
 
@@ -141,10 +153,13 @@ async function generateAnswer(state: GraphInterface) {
         question: state.question
     });
 
+    const end = new Date();
+    console.log(`Time taken to generate answer: ${end.getTime() - start.getTime()} milliseconds`);
     return { generatedAnswer };
 }
 
 async function gradeAnswer(state: GraphInterface) {
+    const start = new Date();
     const answerGraderPrompt = ChatPromptTemplate.fromTemplate(ANSWER_GRADER_TEMPLATE);
     const answerGrader = answerGraderPrompt.pipe(state.jsonResponseModel);
 
@@ -156,9 +171,13 @@ async function gradeAnswer(state: GraphInterface) {
     const parsedResponse = JSON.parse(gradedResponse.content as string);
 
     if (parsedResponse.relevant) {
+        const end = new Date();
+        console.log(`Time taken to grade answer: ${end.getTime() - start.getTime()} milliseconds`);
         return { generatedAnswer: state.generatedAnswer };
     }
 
+    const end = new Date();
+    console.log(`Time taken to grade answer: ${end.getTime() - start.getTime()} milliseconds`);
     return { generatedAnswer: "Sorry, I am unable to help you with this question." };
 }
 
