@@ -12,7 +12,7 @@ import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { ANSWER_GRADER_TEMPLATE, GRADER_TEMPLATE } from "../utils/const";
 
 
-interface GraphInterface {
+export interface GraphInterface {
     question: string;
     generatedAnswer: string;
     documents: Document[];
