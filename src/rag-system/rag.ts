@@ -6,7 +6,7 @@ import { Document } from "@langchain/core/documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { ChatGroq } from "@langchain/groq";
-import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
+import { END, START, StateGraph } from "@langchain/langgraph";
 import * as hub from "langchain/hub";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
@@ -70,7 +70,13 @@ async function createJsonResponseModel(state: GraphInterface) {
     };
 }
 
+let vectorStore: MemoryVectorStore | null = null;
+
 async function buildVectorStore() {
+    if (vectorStore) {
+        return vectorStore;
+    }
+
     const urls = [
         "https://rdev.hashnode.dev/javascript-interview-preparation-cheatsheet",
         "https://rdev.hashnode.dev/getting-rid-of-errors-in-javascript",
@@ -90,7 +96,7 @@ async function buildVectorStore() {
 
     const splittedDocs = await textSplitter.splitDocuments(docs.flat());
 
-    const vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new HuggingFaceTransformersEmbeddings({
+    vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new HuggingFaceTransformersEmbeddings({
         model: "Xenova/all-MiniLM-L6-v2",
     }));
 
@@ -100,6 +106,7 @@ async function buildVectorStore() {
 // node to retrieve docs according to input question from the vector store
 async function retrieveDocs(state: GraphInterface) {
     const start = new Date();
+    console.log("server invoked");
     const vectorStore = await buildVectorStore();
 
     const retrievedDocs = await vectorStore.asRetriever().invoke(state.question);
@@ -200,14 +207,17 @@ const graph = new StateGraph<GraphInterface>({ channels: graphState })
     .addEdge("grade_answer", END);
 
 const ragApp = graph.compile({
-    checkpointer: new MemorySaver()
+    // checkpointer: new MemorySaver()
 });
 
 export async function invokeRAG(question: string) {
+    console.log("reached invoke function");
     const graphResponse: GraphInterface = await ragApp.invoke(
         { question },
         { configurable: { thread_id: "1" } }
     );
+
+    // console.log(ragApp.getGraph().drawMermaid());
 
     return graphResponse;
 }
