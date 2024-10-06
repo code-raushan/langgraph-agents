@@ -5,8 +5,8 @@ import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddin
 import { Document } from "@langchain/core/documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { ChatGroq } from "@langchain/groq";
 import { CompiledStateGraph, END, MemorySaver, START, StateDefinition, StateGraph } from "@langchain/langgraph";
+import { ChatOllama } from "@langchain/ollama";
 import * as hub from "langchain/hub";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
@@ -16,8 +16,10 @@ export interface GraphInterface {
     question: string;
     generatedAnswer: string;
     documents: Document[];
-    model: ChatGroq;
-    jsonResponseModel: ChatGroq;
+    // model: ChatGroq;
+    // jsonResponseModel: ChatGroq;
+    model: ChatOllama;
+    jsonResponseModel: ChatOllama;
 }
 
 class RAGSystem {
@@ -66,24 +68,37 @@ class RAGSystem {
 
     private async createModel(state: GraphInterface) {
         return {
-            model: new ChatGroq({
-                model: "llama-3.2-3b-preview",
+            model: new ChatOllama({
+                model: "llama3.2:latest",
+                baseUrl: "http://localhost:11434",
                 temperature: 0,
-                apiKey: process.env.GROQ_API_KEY as string
-            })
+            }),
+            // model: new ChatGroq({
+            //     model: "llama-3.2-3b-preview",
+            //     temperature: 0,
+            //     apiKey: process.env.GROQ_API_KEY as string
+            // })
         };
     }
 
     private async createJsonResponseModel(state: GraphInterface) {
-        const groqModel = new ChatGroq({
-            model: "llama-3.2-3b-preview",
-            temperature: 0,
-            apiKey: process.env.GROQ_API_KEY as string
-        });
+        // const groqModel = new ChatGroq({
+        //     model: "llama-3.2-3b-preview",
+        //     temperature: 0,
+        //     apiKey: process.env.GROQ_API_KEY as string
+        // });
 
+        // return {
+        //     jsonResponseModel: groqModel.bind({
+        //         response_format: { type: "json_object" }
+        //     })
+        // };
         return {
-            jsonResponseModel: groqModel.bind({
-                response_format: { type: "json_object" }
+            jsonResponseModel: new ChatOllama({
+                model: "llama3.2:latest",
+                baseUrl: "http://localhost:11434",
+                temperature: 0,
+                format: "json"
             })
         };
     }
@@ -213,5 +228,4 @@ class RAGSystem {
     }
 }
 
-// Export an instance of the RAGSystem
 export const ragSystem = new RAGSystem();
