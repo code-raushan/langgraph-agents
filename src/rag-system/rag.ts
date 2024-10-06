@@ -1,5 +1,5 @@
-/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/hf_transformers";
 import { Document } from "@langchain/core/documents";
@@ -135,19 +135,14 @@ class RAGSystem {
     }
 
     private async retrieveDocs(state: GraphInterface) {
-        const start = new Date();
-        console.log("server invoked");
+
         const vectorStore = await this.buildVectorStore();
 
         const retrievedDocs = await vectorStore.asRetriever().invoke(state.question);
-        const end = new Date();
-        console.log(`Time taken to retrieve docs: ${end.getTime() - start.getTime()} milliseconds`);
-
         return { documents: retrievedDocs };
     }
 
     private async gradeDocuments(state: GraphInterface) {
-        const start = new Date();
         const docs = state.documents;
         const gradingPrompt = ChatPromptTemplate.fromTemplate(GRADER_TEMPLATE);
         const docsGrader = gradingPrompt.pipe(state.jsonResponseModel);
@@ -163,21 +158,17 @@ class RAGSystem {
         });
 
         const gradedDocs = await Promise.all(gradingPromises);
-        const end = new Date();
-        console.log(`Time taken to grade docs: ${end.getTime() - start.getTime()} milliseconds`);
+
         return { documents: gradedDocs.filter(Boolean) };
     }
 
     private hasRelevantDocs(state: GraphInterface) {
-        const start = new Date();
         const relevant = state.documents.length > 0;
-        const end = new Date();
-        console.log(`Time taken to check relevant docs: ${end.getTime() - start.getTime()} milliseconds`);
+
         return relevant ? "yes" : "no";
     }
 
     private async generateAnswer(state: GraphInterface) {
-        const start = new Date();
         const ragPrompt = await hub.pull("rlm/rag-prompt");
         const ragChain = ragPrompt.pipe(state.model).pipe(new StringOutputParser());
 
@@ -186,13 +177,11 @@ class RAGSystem {
             question: state.question
         });
 
-        const end = new Date();
-        console.log(`Time taken to generate answer: ${end.getTime() - start.getTime()} milliseconds`);
+
         return { generatedAnswer };
     }
 
     private async gradeAnswer(state: GraphInterface) {
-        const start = new Date();
         const answerGraderPrompt = ChatPromptTemplate.fromTemplate(ANSWER_GRADER_TEMPLATE);
         const answerGrader = answerGraderPrompt.pipe(state.jsonResponseModel);
 
@@ -204,18 +193,14 @@ class RAGSystem {
         const parsedResponse = JSON.parse(gradedResponse.content as string);
 
         if (parsedResponse.relevant) {
-            const end = new Date();
-            console.log(`Time taken to grade answer: ${end.getTime() - start.getTime()} milliseconds`);
             return { generatedAnswer: state.generatedAnswer };
         }
 
-        const end = new Date();
-        console.log(`Time taken to grade answer: ${end.getTime() - start.getTime()} milliseconds`);
+
         return { generatedAnswer: "Sorry, I am unable to help you with this question." };
     }
 
     public async invokeRAG(question: string) {
-        console.log("reached invoke function");
         if (!this.ragApp) {
             throw new Error("RAG app is not initialized");
         }
