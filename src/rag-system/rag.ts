@@ -35,36 +35,38 @@ const graphState = {
 
 // create model node
 async function createModel(state: GraphInterface) {
-    // const model = new ChatOllama({
-    //     model: "llama3.2:latest",
-    //     baseUrl: "http://localhost:11434",
-    //     temperature: 0,
-    // });
-    const model = new ChatGroq({
-        model: "llama-3.2-3b-preview",
-        temperature: 0,
-    });
-
-    return { model };
+    return {
+        //model: new ChatOllama({
+        //     model: "llama3.2:latest",
+        //     baseUrl: "http://localhost:11434",
+        //     temperature: 0,
+        // });
+        model: new ChatGroq({
+            model: "llama-3.2-3b-preview",
+            temperature: 0,
+            apiKey: process.env.GROQ_API_KEY as string
+        })
+    };
 }
 
 async function createJsonResponseModel(state: GraphInterface) {
-    // const jsonResponseModel = new ChatOllama({
-    //     model: "llama3.2:latest",
-    //     baseUrl: "http://localhost:11434",
-    //     temperature: 0,
-    //     format: "json"
-    // });
     const groqModel = new ChatGroq({
         model: "llama-3.2-3b-preview",
         temperature: 0,
+        apiKey: process.env.GROQ_API_KEY as string
     });
 
-    const jsonResponseModel = groqModel.bind({
-        response_format: { type: "json_object" }
-    });
-
-    return { jsonResponseModel };
+    return {
+        //jsonResponseModel: new ChatOllama({
+        //     model: "llama3.2:latest",
+        //     baseUrl: "http://localhost:11434",
+        //     temperature: 0,
+        //     format: "json"
+        // });
+        jsonResponseModel: groqModel.bind({
+            response_format: { type: "json_object" }
+        })
+    };
 }
 
 async function buildVectorStore() {
@@ -182,11 +184,11 @@ const ragApp = graph.compile({
     checkpointer: new MemorySaver()
 });
 
-export const invokeRAG = async (question: string) => {
+export async function invokeRAG(question: string) {
     const graphResponse: GraphInterface = await ragApp.invoke(
         { question },
         { configurable: { thread_id: "1" } }
     );
 
     return graphResponse;
-};
+}
