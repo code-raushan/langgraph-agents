@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
+import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { Document } from "@langchain/core/documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
@@ -7,7 +8,6 @@ import { CompiledStateGraph, END, MemorySaver, START, StateDefinition, StateGrap
 import { ChatOllama } from "@langchain/ollama";
 import { ChatOpenAI } from "@langchain/openai";
 import * as hub from "langchain/hub";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import config from "../config";
 import { initializeVectorStore } from "../connection";
 import { ANSWER_GRADER_TEMPLATE, GRADER_TEMPLATE } from "../utils/const";
@@ -23,7 +23,8 @@ export interface GraphInterface {
 }
 
 class RAGSystem {
-    private vectorStore: MemoryVectorStore | null = null;
+    // private vectorStore: MemoryVectorStore | null = null;
+    private vectorStore: PGVectorStore | null = null;
     private graph: StateGraph<GraphInterface> | null = null;
     private ragApp: CompiledStateGraph<GraphInterface, Partial<GraphInterface>, "__start__", StateDefinition, StateDefinition, StateDefinition> | null = null;
 
@@ -118,9 +119,9 @@ class RAGSystem {
         //     model: "Xenova/all-MiniLM-L6-v2",
         // }));
 
-        // return this.vectorStore;
-        const vectorStore = await initializeVectorStore();
-        return vectorStore;
+        // retcurn this.vectorStore;
+        this.vectorStore = await initializeVectorStore();
+        return this.vectorStore;
     }
 
     private async retrieveDocs(state: GraphInterface) {
