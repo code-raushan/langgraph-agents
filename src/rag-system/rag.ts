@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
-import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/hf_transformers";
 import { Document } from "@langchain/core/documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { CompiledStateGraph, END, MemorySaver, START, StateDefinition, StateGraph } from "@langchain/langgraph";
 import { ChatOllama } from "@langchain/ollama";
+import { ChatOpenAI } from "@langchain/openai";
 import * as hub from "langchain/hub";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import config from "../config";
+import { initializeVectorStore } from "../connection";
 import { ANSWER_GRADER_TEMPLATE, GRADER_TEMPLATE } from "../utils/const";
 
 export interface GraphInterface {
@@ -68,37 +68,24 @@ class RAGSystem {
 
     private async createModel(state: GraphInterface) {
         return {
-            model: new ChatOllama({
-                model: "llama3.2:latest",
-                baseUrl: "http://localhost:11434",
+            model: new ChatOpenAI({
+                model: "gpt-4o-mini",
                 temperature: 0,
+                apiKey: config.OPENAI_API_KEY,
             }),
-            // model: new ChatGroq({
-            //     model: "llama-3.2-3b-preview",
-            //     temperature: 0,
-            //     apiKey: process.env.GROQ_API_KEY as string
-            // })
         };
     }
 
     private async createJsonResponseModel(state: GraphInterface) {
-        // const groqModel = new ChatGroq({
-        //     model: "llama-3.2-3b-preview",
-        //     temperature: 0,
-        //     apiKey: process.env.GROQ_API_KEY as string
-        // });
+        const jsonResponseModel = new ChatOpenAI({
+            model: "gpt-4o-mini",
+            temperature: 0,
+            apiKey: config.OPENAI_API_KEY,
+        });
 
-        // return {
-        //     jsonResponseModel: groqModel.bind({
-        //         response_format: { type: "json_object" }
-        //     })
-        // };
         return {
-            jsonResponseModel: new ChatOllama({
-                model: "llama3.2:latest",
-                baseUrl: "http://localhost:11434",
-                temperature: 0,
-                format: "json"
+            jsonResponseModel: jsonResponseModel.bind({
+                response_format: { type: "json_object" }
             })
         };
     }
@@ -108,30 +95,32 @@ class RAGSystem {
             return this.vectorStore;
         }
 
-        const urls = [
-            "https://rdev.hashnode.dev/javascript-interview-preparation-cheatsheet",
-            "https://rdev.hashnode.dev/getting-rid-of-errors-in-javascript",
-            "https://rdev.hashnode.dev/map-reduce-and-filter-the-saviour-guide",
-            "https://rdev.hashnode.dev/everything-about-arrays-in-javascript",
-        ];
+        // const urls = [
+        //     "https://rdev.hashnode.dev/javascript-interview-preparation-cheatsheet",
+        //     "https://rdev.hashnode.dev/getting-rid-of-errors-in-javascript",
+        //     "https://rdev.hashnode.dev/map-reduce-and-filter-the-saviour-guide",
+        //     "https://rdev.hashnode.dev/everything-about-arrays-in-javascript",
+        // ];
 
-        const docs = await Promise.all(urls.map(url => {
-            const loader = new CheerioWebBaseLoader(url);
-            return loader.load();
-        }));
+        // const docs = await Promise.all(urls.map(url => {
+        //     const loader = new CheerioWebBaseLoader(url);
+        //     return loader.load();
+        // }));
 
-        const textSplitter = new RecursiveCharacterTextSplitter({
-            chunkSize: 250,
-            chunkOverlap: 0,
-        });
+        // const textSplitter = new RecursiveCharacterTextSplitter({
+        //     chunkSize: 250,
+        //     chunkOverlap: 0,
+        // });
 
-        const splittedDocs = await textSplitter.splitDocuments(docs.flat());
+        // const splittedDocs = await textSplitter.splitDocuments(docs.flat());
 
-        this.vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new HuggingFaceTransformersEmbeddings({
-            model: "Xenova/all-MiniLM-L6-v2",
-        }));
+        // this.vectorStore = await MemoryVectorStore.fromDocuments(splittedDocs, new HuggingFaceTransformersEmbeddings({
+        //     model: "Xenova/all-MiniLM-L6-v2",
+        // }));
 
-        return this.vectorStore;
+        // return this.vectorStore;
+        const vectorStore = await initializeVectorStore();
+        return vectorStore;
     }
 
     private async retrieveDocs(state: GraphInterface) {
@@ -173,10 +162,9 @@ class RAGSystem {
         const ragChain = ragPrompt.pipe(state.model).pipe(new StringOutputParser());
 
         const generatedAnswer = await ragChain.invoke({
-            context: state.documents,
+            context: state.documents.map(doc => doc.pageContent).join("\n"),
             question: state.question
         });
-
 
         return { generatedAnswer };
     }
