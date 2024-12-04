@@ -1,11 +1,20 @@
 /* eslint-disable no-console */
 import dotenv from "dotenv";
 import express, { Request, Response } from "express";
+import { initializeVectorStore } from "./connection";
 import { GraphInterface, ragSystem } from "./rag-system/rag";
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+
+(async () => {
+    await initializeVectorStore().then(() => {
+        console.log("Vector store initialized");
+    }).catch((err) => {
+        console.log("Error initializing vector store", err);
+    });
+})();
 
 app.post("/ask", async (req: Request, res: Response) => {
     const question = req.body.question as string;
